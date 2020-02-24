@@ -45,12 +45,6 @@ except RuntimeError:
     print("Error importing RPi.GPIO. This is probably because you need superuser. Try running again with 'sudo'.")
 
 
-def setup_gpio():
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(DOORBELL_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    GPIO.add_event_detect(DOORBELL_PIN, GPIO.RISING, callback=ring_doorbell, bouncetime=2000)
-
-
 def show_screen():
     os.system("tvservice -p")
     os.system("xset dpms force on")
@@ -60,9 +54,16 @@ def hide_screen():
     os.system("tvservice -o")
 
 
-def wait_forever():
-    while True:
-        time.sleep(0.1)
+def send_email_notification(chat_url):
+    if ENABLE_EMAIL:
+        sender = EmailSender(FROM_EMAIL, FROM_EMAIL_PASSWORD)
+        email = Email(
+            sender,
+            'Video Doorbell',
+            'Notification: A visitor is waiting',
+            'A video doorbell caller is waiting on the virtual meeting room. Meet them at %s' % chat_url
+        )
+        email.send(TO_EMAIL)
 
 
 def ring_doorbell(pin):
@@ -79,18 +80,6 @@ def ring_doorbell(pin):
     video_chat.end()
 
     hide_screen()
-
-
-def send_email_notification(chat_url):
-    if ENABLE_EMAIL:
-        sender = EmailSender(FROM_EMAIL, FROM_EMAIL_PASSWORD)
-        email = Email(
-            sender,
-            'Video Doorbell',
-            'Notification: A visitor is waiting',
-            'A video doorbell caller is waiting on the virtual meeting room. Meet them at %s' % chat_url
-        )
-        email.send(TO_EMAIL)
 
 
 class SoundEffect:
@@ -153,17 +142,38 @@ class Email:
         smtp.quit()
 
 
-if __name__ == "__main__":
-    try:
-        print("Starting Doorbell...")
-        hide_screen()
-        setup_gpio()
-        print("Waiting for doorbell rings...")
-        wait_forever()
+class Doorbell:
+    def __init__(self, doorbell_button_pin):
+        self._doorbell_button_pin = doorbell_button_pin
 
-    except KeyboardInterrupt:
-        print("Safely shutting down...")
+    def run(self):
+        try:
+            print("Starting Doorbell...")
+            hide_screen()
+            self._setup_gpio()
+            print("Waiting for doorbell rings...")
+            self._wait_forever()
 
-    finally:
-        GPIO.cleanup(DOORBELL_PIN)
+        except KeyboardInterrupt:
+            print("Safely shutting down...")
+
+        finally:
+            self._cleanup()
+
+    def _wait_forever(self):
+        while True:
+            time.sleep(0.1)
+
+    def _setup_gpio(self):
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self._doorbell_button_pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        GPIO.add_event_detect(self._doorbell_button_pin, GPIO.RISING, callback=ring_doorbell, bouncetime=2000)
+
+    def _cleanup(self):
+        GPIO.cleanup(self._doorbell_button_pin)
         show_screen()
+
+
+if __name__ == "__main__":
+    doorbell = Doorbell(DOORBELL_PIN)
+    doorbell.run()
