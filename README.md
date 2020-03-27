@@ -61,7 +61,7 @@ sudo alsactl store
 
 ### Enable Video Calls
 
-Visit [Jitsi Meet](meet.jitsi.si) and configure the site to use your camera/microphone
+Visit [Jitsi Meet](https://meet.jit.si/) and configure the site to use your camera/microphone
 
 My settings were:
 
